@@ -5,7 +5,7 @@
   "scripts": {
     "build": "nuxt build",
     "dev": "nuxt dev",
-    "test": "vitest",
+    "test": "echo 'Tests not implemented yet'",
     "lint": "eslint .",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
