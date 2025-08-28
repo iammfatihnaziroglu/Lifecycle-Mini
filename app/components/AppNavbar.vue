@@ -1,6 +1,6 @@
 <script setup lang="ts">
+defineEmits<{ (e: 'toggleSidebar'): void }>();
 
-const isOpen = ref(false);
 const notificationCount = ref(3);
 const isUserMenuOpen = ref(false);
 const isQuickAddOpen = ref(false);
@@ -130,16 +130,14 @@ const userInitials = computed(() => {
             </Transition>
           </div>
 
-          <!-- Mobile Menu Toggle -->
+          <!-- Mobile Menu Toggle (opens sidebar) -->
           <button 
             class="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-all duration-200 hover:scale-110"
-            @click="isOpen = !isOpen"
+            aria-label="Menüyü Aç"
+            @click="$emit('toggleSidebar')"
           >
-            <svg v-if="!isOpen" class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-            </svg>
-            <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
             </svg>
           </button>
         </div>
