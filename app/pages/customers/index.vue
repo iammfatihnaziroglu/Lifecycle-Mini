@@ -9,6 +9,7 @@ interface Customer {
   name: string
   email: string
   phone: string
+  countryCode: string
   budget: number
   roomPreference: number
   score: 'Low' | 'Medium' | 'High'
@@ -16,13 +17,14 @@ interface Customer {
 
 
 
-// Müşteri listesi
-const customers = ref<Customer[]>([
+// Varsayılan müşteri listesi
+const defaultCustomers: Customer[] = [
   {
     id: 1,
     name: 'Ahmet Yılmaz',
     email: 'ahmet@example.com',
-    phone: '+90 532 123 4567',
+    phone: '532 123 4567',
+    countryCode: 'TR',
     budget: 500000,
     roomPreference: 3,
     score: 'High'
@@ -31,7 +33,8 @@ const customers = ref<Customer[]>([
     id: 2,
     name: 'Fatma Demir',
     email: 'fatma@example.com',
-    phone: '+90 533 987 6543',
+    phone: '533 987 6543',
+    countryCode: 'TR',
     budget: 300000,
     roomPreference: 2,
     score: 'Medium'
@@ -40,12 +43,24 @@ const customers = ref<Customer[]>([
     id: 3,
     name: 'Mehmet Kaya',
     email: 'mehmet@example.com',
-    phone: '+90 534 555 1234',
+    phone: '534 555 1234',
+    countryCode: 'TR',
     budget: 750000,
     roomPreference: 4,
     score: 'Low'
   }
-])
+]
+
+// Müşteri listesi - localStorage'dan yükle veya varsayılan kullan
+const customers = ref<Customer[]>(defaultCustomers)
+
+// Sayfa yüklendiğinde localStorage'dan veri yükle
+if (import.meta.client) {
+  const saved = localStorage.getItem('customers')
+  if (saved) {
+    customers.value = JSON.parse(saved)
+  }
+}
 
 
 
@@ -66,18 +81,18 @@ const tableColumns = computed(() => [
   {
     key: 'budget',
     label: 'Bütçe',
-    formatter: (value: number) => formatCurrency(value)
+    formatter: (value: unknown) => formatCurrency(value as number)
   },
   {
     key: 'roomPreference',
     label: 'Oda Tercihi',
-    formatter: (value: number) => `${value} oda`
+    formatter: (value: unknown) => `${value as number} oda`
   },
   {
     key: 'score',
     label: 'Skor',
     component: ScoreBadge,
-    componentProps: (row: Customer) => ({ score: row.score })
+    componentProps: (row: Record<string, unknown>) => ({ score: (row as unknown as Customer).score })
   }
 ])
 
@@ -91,6 +106,41 @@ function formatCurrency(amount: number) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0
   }).format(amount)
+}
+
+// Skor hesaplama fonksiyonu
+function calculateScore(budget: number): 'Low' | 'Medium' | 'High' {
+  if (budget >= 500000) return 'High'
+  if (budget >= 300000) return 'Medium'
+  return 'Low'
+}
+
+// Yeni müşteri ekleme fonksiyonu - global olarak erişilebilir
+function addNewCustomer(customerData: {
+  name: string
+  email: string
+  phone: string
+  countryCode: string
+  budget: number
+  roomPreference: number
+}) {
+  const newCustomer: Customer = {
+    id: Date.now(),
+    ...customerData,
+    score: calculateScore(customerData.budget)
+  }
+  
+  customers.value.push(newCustomer)
+  
+  // localStorage'a kaydet
+  if (import.meta.client) {
+    localStorage.setItem('customers', JSON.stringify(customers.value))
+  }
+}
+
+// Global olarak erişilebilir yap
+if (import.meta.client) {
+  (window as unknown as Record<string, unknown>).addNewCustomer = addNewCustomer
 }
 </script>
 

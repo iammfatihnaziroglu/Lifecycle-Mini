@@ -1,14 +1,41 @@
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 
 // Form verileri interface'i
 interface CustomerForm {
   name: string
   email: string
   phone: string
+  countryCode: string
   budget: number
   roomPreference: number
 }
+
+// Ülke kodları
+interface Country {
+  code: string
+  name: string
+  dialCode: string
+  flag: string
+}
+
+const countries: Country[] = [
+  { code: 'TR', name: 'Türkiye', dialCode: '+90', flag: '🇹🇷' },
+  { code: 'US', name: 'Amerika Birleşik Devletleri', dialCode: '+1', flag: '🇺🇸' },
+  { code: 'GB', name: 'Birleşik Krallık', dialCode: '+44', flag: '🇬🇧' },
+  { code: 'DE', name: 'Almanya', dialCode: '+49', flag: '🇩🇪' },
+  { code: 'FR', name: 'Fransa', dialCode: '+33', flag: '🇫🇷' },
+  { code: 'IT', name: 'İtalya', dialCode: '+39', flag: '🇮🇹' },
+  { code: 'ES', name: 'İspanya', dialCode: '+34', flag: '🇪🇸' },
+  { code: 'NL', name: 'Hollanda', dialCode: '+31', flag: '🇳🇱' },
+  { code: 'BE', name: 'Belçika', dialCode: '+32', flag: '🇧🇪' },
+  { code: 'CH', name: 'İsviçre', dialCode: '+41', flag: '🇨🇭' },
+  { code: 'AT', name: 'Avusturya', dialCode: '+43', flag: '🇦🇹' },
+  { code: 'SE', name: 'İsveç', dialCode: '+46', flag: '🇸🇪' },
+  { code: 'NO', name: 'Norveç', dialCode: '+47', flag: '🇳🇴' },
+  { code: 'DK', name: 'Danimarka', dialCode: '+45', flag: '🇩🇰' },
+  { code: 'FI', name: 'Finlandiya', dialCode: '+358', flag: '🇫🇮' }
+]
 
 // Loading durumu
 const isSubmitting = ref(false)
@@ -18,8 +45,25 @@ const form = reactive<CustomerForm>({
   name: '',
   email: '',
   phone: '',
+  countryCode: 'TR', // Varsayılan olarak Türkiye
   budget: 0,
   roomPreference: 1
+})
+
+// Seçili ülke bilgisi
+const defaultCountry = countries.find(c => c.code === 'TR') || countries[0]!
+const selectedCountry = ref<Country>(defaultCountry) // TR varsayılan
+const isCountryDropdownOpen = ref(false)
+
+// Seçili ülkeye göre placeholder ve örnek göster
+const phoneExample = computed(() => {
+  switch (selectedCountry.value.code) {
+    case 'TR': return '5XX XXX XX XX'
+    case 'US': return '(555) 123-4567'
+    case 'GB': return '7XXX XXXXXX'
+    case 'DE': return '1XX XXXXXXX'
+    default: return 'XXXXXXXXX'
+  }
 })
 
 // Form validasyon
@@ -82,15 +126,34 @@ async function handleAddCustomer() {
     // Simülasyon için 1 saniye bekle
     await new Promise(resolve => setTimeout(resolve, 1000))
 
-    console.log('Yeni müşteri eklendi:', form)
+    // Yeni müşteri verisi
+    const newCustomerData = {
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      countryCode: form.countryCode,
+      budget: form.budget,
+      roomPreference: form.roomPreference
+    }
+
+    // Global fonksiyonu çağır
+    if (typeof window !== 'undefined') {
+      const addCustomerFn = (window as unknown as { addNewCustomer?: (data: typeof newCustomerData) => void }).addNewCustomer
+      if (addCustomerFn && typeof addCustomerFn === 'function') {
+        addCustomerFn(newCustomerData)
+      }
+    }
+
+    console.log('Yeni müşteri eklendi:', {
+      ...newCustomerData,
+      fullPhone: selectedCountry.value.dialCode + ' ' + form.phone
+    })
     
     // Başarı mesajı göster
     showToast('Müşteri başarıyla eklendi!', 'success')
 
-    // Form başarıyla gönderildikten sonra müşteri listesine yönlendir
-    setTimeout(() => {
-      navigateTo('/customers')
-    }, 1500)
+    // Hemen müşteri listesine yönlendir
+    navigateTo('/customers')
 
   } catch {
     showToast('Müşteri eklenirken bir hata oluştu!', 'error')
@@ -111,6 +174,29 @@ function showToast(message: string, type: 'success' | 'error') {
     toast.value.show = false
   }, 3000)
 }
+
+// Ülke seçimi fonksiyonu
+function selectCountry(country: Country) {
+  selectedCountry.value = country
+  form.countryCode = country.code
+  isCountryDropdownOpen.value = false
+}
+
+// Click outside to close dropdown
+function handleClickOutside(event: Event) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.country-dropdown')) {
+    isCountryDropdownOpen.value = false
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+})
 
 // Geri gitme fonksiyonu
 function goBack() {
@@ -188,16 +274,53 @@ function goBack() {
               <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
                 Telefon <span class="text-red-500">*</span>
               </label>
-              <input
-                id="phone"
-                v-model="form.phone"
-                type="tel"
-                :class="[
-                  'block w-full px-3 py-2 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors',
-                  errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
-                ]"
-                placeholder="+90 5XX XXX XX XX"
-              >
+              <div class="relative">
+                <!-- Ülke Seçici -->
+                <div class="absolute inset-y-0 left-0 flex items-center">
+                  <div class="relative country-dropdown">
+                    <button
+                      type="button"
+                      class="flex items-center px-3 py-2 border-r border-gray-300 bg-gray-50 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:z-10 rounded-l-lg transition-colors"
+                      @click="isCountryDropdownOpen = !isCountryDropdownOpen"
+                    >
+                      <span class="mr-2">{{ selectedCountry.flag }}</span>
+                      <span class="mr-1">{{ selectedCountry.dialCode }}</span>
+                      <svg class="w-4 h-4 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                    
+                    <!-- Dropdown -->
+                    <div
+                      v-if="isCountryDropdownOpen"
+                      class="absolute top-full left-0 z-50 w-80 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
+                    >
+                      <div
+                        v-for="country in countries"
+                        :key="country.code"
+                        class="flex items-center px-3 py-2 hover:bg-gray-100 cursor-pointer transition-colors"
+                        @click="selectCountry(country)"
+                      >
+                        <span class="mr-3">{{ country.flag }}</span>
+                        <span class="flex-1 text-sm text-gray-900">{{ country.name }}</span>
+                        <span class="text-sm text-gray-500">{{ country.dialCode }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Telefon Input -->
+                <input
+                  id="phone"
+                  v-model="form.phone"
+                  type="tel"
+                  :class="[
+                    'block w-full pl-24 pr-3 py-2 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors',
+                    errors.phone ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                  ]"
+                  :placeholder="phoneExample"
+                >
+              </div>
               <p v-if="errors.phone" class="mt-2 text-sm text-red-600">{{ errors.phone }}</p>
             </div>
 
