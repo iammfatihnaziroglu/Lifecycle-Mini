@@ -50,6 +50,34 @@ const form = reactive<CustomerForm>({
   roomPreference: 1
 })
 
+// Formatlanmış bütçe gösterimi için
+const formattedBudget = ref('')
+
+// Sayıyı formatla (1.300.000 şeklinde)
+function formatNumber(value: string): string {
+  // Sadece rakamları al
+  const numbers = value.replace(/\D/g, '')
+  // 3'lü gruplar halinde nokta ekle
+  return numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+
+// Formatlanmış string'i sayıya çevir
+function parseFormattedNumber(value: string): number {
+  return parseInt(value.replace(/\D/g, '')) || 0
+}
+
+// Bütçe input değiştiğinde
+function handleBudgetChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const value = target.value
+  
+  // Formatlanmış değeri göster
+  formattedBudget.value = formatNumber(value)
+  
+  // Gerçek sayı değerini form'a kaydet
+  form.budget = parseFormattedNumber(value)
+}
+
 // Seçili ülke bilgisi
 const defaultCountry = countries.find(c => c.code === 'TR') || countries[0]!
 const selectedCountry = ref<Country>(defaultCountry) // TR varsayılan
@@ -75,10 +103,18 @@ const errors = reactive({
 })
 
 // Toast mesajı
-const toast = ref({
+interface Toast {
+  show: boolean
+  message: string
+  type: 'success' | 'error'
+  progress: number
+}
+
+const toast = ref<Toast>({
   show: false,
   message: '',
-  type: 'success' as 'success' | 'error'
+  type: 'success',
+  progress: 0
 })
 
 // Form validasyon fonksiyonu
@@ -123,9 +159,6 @@ async function handleAddCustomer() {
   isSubmitting.value = true
 
   try {
-    // Simülasyon için 1 saniye bekle
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
     // Yeni müşteri verisi
     const newCustomerData = {
       name: form.name,
@@ -136,27 +169,38 @@ async function handleAddCustomer() {
       roomPreference: form.roomPreference
     }
 
-    // Global fonksiyonu çağır
-    if (typeof window !== 'undefined') {
-      const addCustomerFn = (window as unknown as { addNewCustomer?: (data: typeof newCustomerData) => void }).addNewCustomer
-      if (addCustomerFn && typeof addCustomerFn === 'function') {
-        addCustomerFn(newCustomerData)
-      }
+    // API'ye gönder
+    const response = await fetch('http://localhost:3001/api/customers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(newCustomerData)
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Müşteri eklenirken hata oluştu')
     }
 
+    const newCustomer = await response.json()
+
     console.log('Yeni müşteri eklendi:', {
-      ...newCustomerData,
+      ...newCustomer,
       fullPhone: selectedCountry.value.dialCode + ' ' + form.phone
     })
     
     // Başarı mesajı göster
     showToast('Müşteri başarıyla eklendi!', 'success')
 
-    // Hemen müşteri listesine yönlendir
-    navigateTo('/customers')
+    // 1.5 saniye bekle, sonra müşteri listesine yönlendir
+    setTimeout(() => {
+      navigateTo('/customers')
+    }, 1500)
 
-  } catch {
-    showToast('Müşteri eklenirken bir hata oluştu!', 'error')
+  } catch (error) {
+    console.error('Error adding customer:', error)
+    showToast(error instanceof Error ? error.message : 'Müşteri eklenirken bir hata oluştu!', 'error')
   } finally {
     isSubmitting.value = false
   }
@@ -167,12 +211,29 @@ function showToast(message: string, type: 'success' | 'error') {
   toast.value = {
     show: true,
     message,
-    type
+    type,
+    progress: 0
   }
 
+  // Progress bar animasyonu - 1.5 saniye
+  const duration = 1500
+  const interval = 10 // 10ms her güncelleme
+  const steps = duration / interval
+  const increment = 100 / steps
+
+  const progressInterval = setInterval(() => {
+    toast.value.progress += increment
+    if (toast.value.progress >= 100) {
+      toast.value.progress = 100
+      clearInterval(progressInterval)
+    }
+  }, interval)
+
+  // 1.5 saniye sonra toast'u kapat
   setTimeout(() => {
     toast.value.show = false
-  }, 3000)
+    toast.value.progress = 0
+  }, duration)
 }
 
 // Ülke seçimi fonksiyonu
@@ -335,15 +396,15 @@ function goBack() {
                 </div>
                 <input
                   id="budget"
-                  v-model.number="form.budget"
-                  type="number"
-                  min="0"
-                  step="1000"
+                  v-model="formattedBudget"
+                  type="text"
+                  inputmode="numeric"
                   :class="[
                     'block w-full pl-7 pr-3 py-2 border rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors',
                     errors.budget ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   ]"
-                  placeholder="500,000"
+                  placeholder="500.000"
+                  @input="handleBudgetChange"
                 >
               </div>
               <p v-if="errors.budget" class="mt-2 text-sm text-red-600">{{ errors.budget }}</p>
@@ -402,29 +463,41 @@ function goBack() {
     <div
       v-if="toast.show"
       :class="[
-        'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg transition-all duration-300 max-w-md',
-        toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+        'fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 p-4 rounded-xl shadow-2xl transition-all duration-500 max-w-md w-full mx-4',
+        toast.type === 'success' 
+          ? 'bg-gradient-to-r from-green-500 to-green-600 text-white border border-green-400' 
+          : 'bg-gradient-to-r from-red-500 to-red-600 text-white border border-red-400'
       ]"
     >
-      <div class="flex items-center">
-        <svg 
-          v-if="toast.type === 'success'"
-          class="w-5 h-5 mr-3 flex-shrink-0" 
-          fill="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-        </svg>
-        <svg 
-          v-else
-          class="w-5 h-5 mr-3 flex-shrink-0" 
-          fill="currentColor" 
-          viewBox="0 0 24 24"
-        >
-          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-        </svg>
-        <span class="text-sm font-medium">{{ toast.message }}</span>
+      <div class="flex items-center justify-center">
+        <div class="flex items-center">
+          <svg 
+            v-if="toast.type === 'success'"
+            class="w-6 h-6 mr-3 flex-shrink-0" 
+            fill="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+          <svg 
+            v-else
+            class="w-6 h-6 mr-3 flex-shrink-0" 
+            fill="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+          </svg>
+          <span class="text-sm font-semibold">{{ toast.message }}</span>
+        </div>
       </div>
+      
+                    <!-- Progress bar -->
+        <div class="mt-3 h-1 bg-white bg-opacity-20 rounded-full overflow-hidden">
+          <div 
+            class="h-full bg-yellow-300 transition-all duration-100 ease-linear shadow-sm"
+            :style="{ width: Math.max(toast.progress, 1) + '%' }"
+          />
+        </div>
     </div>
   </div>
 </template>

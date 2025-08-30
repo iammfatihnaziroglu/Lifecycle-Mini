@@ -1,70 +1,49 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import CustomerTable from '~/components/customers/CustomerTable.vue'
 import ScoreBadge from '~/components/ScoreBadge.vue'
 
-// Müşteri tipini tanımla
 interface Customer {
   id: number
   name: string
   email: string
-  phone: string
+  phone: number
   countryCode: string
   budget: number
   roomPreference: number
   score: 'Low' | 'Medium' | 'High'
 }
 
+const customers = ref<Customer[]>([])
+const loading = ref(false)
+const error = ref('')
 
-
-// Varsayılan müşteri listesi
-const defaultCustomers: Customer[] = [
-  {
-    id: 1,
-    name: 'Ahmet Yılmaz',
-    email: 'ahmet@example.com',
-    phone: '532 123 4567',
-    countryCode: 'TR',
-    budget: 500000,
-    roomPreference: 3,
-    score: 'High'
-  },
-  {
-    id: 2,
-    name: 'Fatma Demir',
-    email: 'fatma@example.com',
-    phone: '533 987 6543',
-    countryCode: 'TR',
-    budget: 300000,
-    roomPreference: 2,
-    score: 'Medium'
-  },
-  {
-    id: 3,
-    name: 'Mehmet Kaya',
-    email: 'mehmet@example.com',
-    phone: '534 555 1234',
-    countryCode: 'TR',
-    budget: 750000,
-    roomPreference: 4,
-    score: 'Low'
-  }
-]
-
-// Müşteri listesi - localStorage'dan yükle veya varsayılan kullan
-const customers = ref<Customer[]>(defaultCustomers)
-
-// Sayfa yüklendiğinde localStorage'dan veri yükle
-if (import.meta.client) {
-  const saved = localStorage.getItem('customers')
-  if (saved) {
-    customers.value = JSON.parse(saved)
+async function loadCustomers() {
+  loading.value = true
+  error.value = ''
+  
+  try {
+    const response = await fetch('http://localhost:3001/api/customers')
+    if (!response.ok) {
+      throw new Error('Müşteriler yüklenirken hata oluştu')
+    }
+    customers.value = await response.json()
+  } catch (err) {
+    console.error('Error loading customers:', err)
+    error.value = 'Müşteriler yüklenirken hata oluştu'
+    // Fallback olarak boş liste kullan
+    customers.value = []
+  } finally {
+    loading.value = false
   }
 }
 
+// Sayfa yüklendiğinde API'den veri yükle
+onMounted(() => {
+  loadCustomers()
+})
 
 
-// Tablo sütunları tanımı
 const tableColumns = computed(() => [
   {
     key: 'name',
@@ -76,7 +55,8 @@ const tableColumns = computed(() => [
   },
   {
     key: 'phone',
-    label: 'Telefon'
+    label: 'Telefon',
+    formatter: (value: unknown) => formatPhone(value as string)
   },
   {
     key: 'budget',
@@ -97,8 +77,6 @@ const tableColumns = computed(() => [
 ])
 
 
-
-// Para formatı
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat('tr-TR', {
     style: 'currency',
@@ -108,33 +86,46 @@ function formatCurrency(amount: number) {
   }).format(amount)
 }
 
-// Skor hesaplama fonksiyonu
-function calculateScore(budget: number): 'Low' | 'Medium' | 'High' {
-  if (budget >= 500000) return 'High'
-  if (budget >= 300000) return 'Medium'
-  return 'Low'
+// Telefon formatı
+function formatPhone(phone: string) {
+  // Eğer zaten 0 ile başlıyorsa olduğu gibi döndür
+  if (phone.startsWith('0')) {
+    return phone
+  }
+  // Değilse başına 0 ekle
+  return `0 ${phone}`
 }
 
-// Yeni müşteri ekleme fonksiyonu - global olarak erişilebilir
-function addNewCustomer(customerData: {
+async function addNewCustomer(customerData: {
   name: string
   email: string
-  phone: string
+  phone: number
   countryCode: string
   budget: number
   roomPreference: number
 }) {
-  const newCustomer: Customer = {
-    id: Date.now(),
-    ...customerData,
-    score: calculateScore(customerData.budget)
-  }
-  
-  customers.value.push(newCustomer)
-  
-  // localStorage'a kaydet
-  if (import.meta.client) {
-    localStorage.setItem('customers', JSON.stringify(customers.value))
+  try {
+    const response = await fetch('http://localhost:3001/api/customers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(customerData)
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Müşteri eklenirken hata oluştu')
+    }
+
+    const newCustomer = await response.json()
+    
+    customers.value.push(newCustomer)
+    
+    return newCustomer
+  } catch (error) {
+    console.error('Error adding customer:', error)
+    throw error
   }
 }
 
@@ -171,10 +162,22 @@ if (import.meta.client) {
     <CustomerTable 
       :columns="tableColumns"
       :data="customers"
+      :loading="loading"
       empty-message="Henüz müşteri yok"
       empty-description="İlk müşterinizi ekleyerek başlayın."
     />
 
-
+    <!-- Hata mesajı -->
+    <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
+      <div class="flex">
+        <svg class="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+        <div>
+          <h3 class="text-sm font-medium text-red-800">Hata</h3>
+          <p class="text-sm text-red-700 mt-1">{{ error }}</p>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
