@@ -166,7 +166,7 @@ const userInitials = computed(() => {
         </div>
         <div class="p-4 grid grid-cols-1 gap-2">
           <NuxtLink
-            to="/customers/new"
+            to="/customers/newcustomers"
             class="group flex items-center justify-between px-3 py-3 rounded-xl border border-gray-200 hover:border-blue-200 hover:bg-blue-50/40 transition-all"
             @click="isQuickAddOpen = false"
           >

@@ -1,75 +1,137 @@
-# Nuxt Minimal Starter
+# Lifecycle Mini - Müşteri Yönetim Sistemi
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Vue.js 3 + Nuxt 3 + Express.js ile geliştirilmiş basit müşteri yönetim sistemi.
 
-## Setup
+## Özellikler
 
-Make sure to install dependencies:
+- ✅ Müşteri listesi görüntüleme
+- ✅ Yeni müşteri ekleme
+- ✅ Müşteri skorlama (bütçeye göre)
+- ✅ Responsive tasarım
+- ✅ Backend API (Express.js)
+- ✅ JSON dosya tabanlı veri saklama
+
+## Teknolojiler
+
+### Frontend
+- **Vue.js 3** - Progressive JavaScript framework
+- **Nuxt 3** - Vue.js meta-framework
+- **Tailwind CSS** - Utility-first CSS framework
+- **TypeScript** - Type-safe JavaScript
+
+### Backend
+- **Node.js** - JavaScript runtime
+- **Express.js** - Web application framework
+- **CORS** - Cross-origin resource sharing
+- **JSON** - Veri saklama
+
+## Kurulum
+
+### 1. Bağımlılıkları Yükle
 
 ```bash
-# npm
+# Ana proje bağımlılıkları
 npm install
 
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+# Backend bağımlılıkları
+cd server
+npm install
+cd ..
 ```
 
-## Development Server
+### 2. Geliştirme Sunucusunu Başlat
 
-Start the development server on `http://localhost:3000`:
-
+#### Sadece Frontend (Nuxt)
 ```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
+Frontend: http://localhost:3000
+
+#### Sadece Backend (Express)
+```bash
+cd server
+npm run dev
+```
+Backend: http://localhost:3001
+
+#### Hem Frontend Hem Backend (Önerilen)
+```bash
+npm run dev:full
+```
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+
+## API Endpoints
+
+### GET /api/customers
+Tüm müşterileri getirir.
+
+### POST /api/customers
+Yeni müşteri ekler.
+
+**Request Body:**
+```json
+{
+  "name": "Müşteri Adı",
+  "email": "musteri@example.com",
+  "phone": "555 123 4567",
+  "countryCode": "TR",
+  "budget": 500000,
+  "roomPreference": 3
+}
+```
+
+### GET /health
+Sunucu durumunu kontrol eder.
+
+## Müşteri Skorlama
+
+Müşteriler bütçelerine göre otomatik olarak skorlanır:
+
+- **High**: 500,000 TL ve üzeri
+- **Medium**: 300,000 - 499,999 TL
+- **Low**: 300,000 TL altı
+
+## Proje Yapısı
+
+```
+lifecycle-mini/
+├── app/                    # Nuxt.js frontend
+│   ├── components/         # Vue bileşenleri
+│   ├── pages/             # Sayfa bileşenleri
+│   └── assets/            # Statik dosyalar
+├── server/                # Express.js backend
+│   ├── server.js          # Ana sunucu dosyası
+│   ├── customers.json     # Müşteri verileri
+│   └── package.json       # Backend bağımlılıkları
+└── package.json           # Ana proje bağımlılıkları
+```
+
+## Geliştirme
+
+### Frontend Geliştirme
+- `app/pages/customers/index.vue` - Müşteri listesi
+- `app/pages/customers/newcustomers.vue` - Yeni müşteri ekleme
+- `app/components/customers/CustomerTable.vue` - Müşteri tablosu
+
+### Backend Geliştirme
+- `server/server.js` - Express.js sunucu
+- `server/customers.json` - Müşteri verileri
 
 ## Production
 
-Build the application for production:
-
+### Frontend Build
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-```
-
-Locally preview production build:
-
-```bash
-# npm
 npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
 ```
 
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+### Backend Production
+```bash
+cd server
+npm start
+```
+
+## Lisans
+
+MIT

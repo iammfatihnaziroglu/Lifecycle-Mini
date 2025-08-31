@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "name": "Ahmet Yılmaz",
+    "email": "ahmety@example.com",
+    "phone": "532 123 4567",
+    "countryCode": "TR",
+    "budget": 1500000,
+    "roomPreference": 3,
+    "score": "Low"
+  },
+  {
+    "id": 2,
+    "name": "Ayşe Demir",
+    "email": "aysed@example.com",
+    "phone": "533 987 6543",
+    "countryCode": "TR",
+    "budget": 3500000,
+    "roomPreference": 2,
+    "score": "Medium"
+  },
+  {
+    "id": 3,
+    "name": "Mehmet Kaya",
+    "email": "mehmetk@example.com",
+    "phone": "534 555 1234",
+    "countryCode": "TR",
+    "budget": 7500000,
+    "roomPreference": 4,
+    "score": "High"
+  }
+]
