@@ -1,48 +1,19 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import CustomerTable from '~/components/customers/CustomerTable.vue'
 import ScoreBadge from '~/components/ScoreBadge.vue'
+import { useCustomersStore } from '~/stores/customers'
 
-interface Customer {
-  id: number
-  name: string
-  email: string
-  phone: number
-  countryCode: string
-  budget: number
-  roomPreference: number
-  score: 'Low' | 'Medium' | 'High'
-}
+// Store'u kullan
+const customersStore = useCustomersStore()
 
-const customers = ref<Customer[]>([])
-const loading = ref(false)
-const error = ref('')
-
-async function loadCustomers() {
-  loading.value = true
-  error.value = ''
-  
-  try {
-    const response = await fetch('http://localhost:3001/api/customers')
-    if (!response.ok) {
-      throw new Error('Müşteriler yüklenirken hata oluştu')
-    }
-    customers.value = await response.json()
-  } catch (err) {
-    console.error('Error loading customers:', err)
-    error.value = 'Müşteriler yüklenirken hata oluştu'
-    // Fallback olarak boş liste kullan
-    customers.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-// Sayfa yüklendiğinde API'den veri yükle
+// Sayfa yüklendiğinde store'dan veri yükle
 onMounted(() => {
-  loadCustomers()
+  // Önce error'u temizle
+  customersStore.clearError()
+  // Sonra veri yükle
+  customersStore.loadCustomers()
 })
-
 
 const tableColumns = computed(() => [
   {
@@ -56,7 +27,7 @@ const tableColumns = computed(() => [
   {
     key: 'phone',
     label: 'Telefon',
-    formatter: (value: unknown) => formatPhone(value as string)
+    formatter: (value: unknown) => formatPhone(value as number)
   },
   {
     key: 'budget',
@@ -72,7 +43,7 @@ const tableColumns = computed(() => [
     key: 'score',
     label: 'Skor',
     component: ScoreBadge,
-    componentProps: (row: Record<string, unknown>) => ({ score: (row as unknown as Customer).score })
+    componentProps: (row: Record<string, unknown>) => ({ score: (row as { score: 'Low' | 'Medium' | 'High' }).score })
   }
 ])
 
@@ -87,51 +58,13 @@ function formatCurrency(amount: number) {
 }
 
 // Telefon formatı
-function formatPhone(phone: string) {
+function formatPhone(phone: number): string {
   // Eğer zaten 0 ile başlıyorsa olduğu gibi döndür
-  if (phone.startsWith('0')) {
-    return phone
+  if (phone.toString().startsWith('0')) {
+    return phone.toString()
   }
   // Değilse başına 0 ekle
-  return `0 ${phone}`
-}
-
-async function addNewCustomer(customerData: {
-  name: string
-  email: string
-  phone: number
-  countryCode: string
-  budget: number
-  roomPreference: number
-}) {
-  try {
-    const response = await fetch('http://localhost:3001/api/customers', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(customerData)
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.error || 'Müşteri eklenirken hata oluştu')
-    }
-
-    const newCustomer = await response.json()
-    
-    customers.value.push(newCustomer)
-    
-    return newCustomer
-  } catch (error) {
-    console.error('Error adding customer:', error)
-    throw error
-  }
-}
-
-// Global olarak erişilebilir yap
-if (import.meta.client) {
-  (window as unknown as Record<string, unknown>).addNewCustomer = addNewCustomer
+  return `0 ${phone.toString()}`
 }
 </script>
 
@@ -161,21 +94,21 @@ if (import.meta.client) {
     <!-- Müşteri Tablosu -->
     <CustomerTable 
       :columns="tableColumns"
-      :data="customers"
-      :loading="loading"
+      :data="customersStore.customers"
+      :loading="customersStore.loading"
       empty-message="Henüz müşteri yok"
       empty-description="İlk müşterinizi ekleyerek başlayın."
     />
 
     <!-- Hata mesajı -->
-    <div v-if="error" class="bg-red-50 border border-red-200 rounded-lg p-4">
+    <div v-if="customersStore.error" class="bg-red-50 border border-red-200 rounded-lg p-4">
       <div class="flex">
         <svg class="w-5 h-5 text-red-400 mr-3" fill="currentColor" viewBox="0 0 24 24">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
         </svg>
         <div>
           <h3 class="text-sm font-medium text-red-800">Hata</h3>
-          <p class="text-sm text-red-700 mt-1">{{ error }}</p>
+          <p class="text-sm text-red-700 mt-1">{{ customersStore.error }}</p>
         </div>
       </div>
     </div>
